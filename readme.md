@@ -31,9 +31,9 @@ In Brief,
 
 ## Current Status
     
-    * The code is ready but i am unable to test it since Access details from Twitter are awaited. 
+* The code is ready but i am unable to test it since Access details from Twitter are awaited. 
 
 ## Roadmap
 
-    * In addition to CLI, Expose the utility as responsive Web Application
-    * Possibly extend this to social media platforms other than [Twitter](https://twitter.com)
+* In addition to CLI, Expose the utility as responsive Web Application
+* Possibly extend this to social media platforms other than [Twitter](https://twitter.com)
