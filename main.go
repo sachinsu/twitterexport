@@ -14,13 +14,32 @@ const (
 )
 
 func main() {
-	if err := run(os.Args, os.Stdout); err != nil {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt)
+	defer func() {
+		signal.Stop(signalChan)
+		cancel()
+	}()
+
+	go func() {
+		select {
+		case <-signalChan: // first signal, cancel context
+			cancel()
+		case <-ctx.Done():
+		}
+		<-signalChan // second signal, hard exit
+		os.Exit(exitCodeInterrupt)
+	}()
+
+	if err := run(ctx, os.Args, os.Stdout); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(exitFail)
 	}
 }
 
-func run(args []string, stdout io.Writer) error {
+func run(ctx context.Context, args []string, stdout io.Writer) error {
 
 	flags := flag.NewFlagSet(args[0], flag.ExitOnError)
 
@@ -44,5 +63,5 @@ func run(args []string, stdout io.Writer) error {
 		defer pprof.StopCPUProfile()
 	}
 
-	return twitter.SendMessages(args)
+	return twitter.SendMessages(ctx, args)
 }
