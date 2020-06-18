@@ -3,10 +3,11 @@ package twitter
 import (
 	"bytes"
 	"context"
-	"github.com/dghubble/go-twitter/twitter"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/dghubble/go-twitter/twitter"
 )
 
 func TestFlagsCorrectness(t *testing.T) {
@@ -48,12 +49,30 @@ func TestFlagsCorrectness(t *testing.T) {
 	}
 }
 
+func cleanupDB(tw *twitterClient, t *testing.T) {
+	t.Cleanup(func() {
+		db, teardown, err := tw.smClient.OpenConnection()
+		if err != nil {
+			t.Logf("Error while cleanup %v", err)
+			return
+		}
+		defer teardown()
+
+		_, _ = db.Exec("delete  from REQUEST")
+
+		_, _ = db.Exec("delete  from Followers")
+
+	})
+}
+
 func TestAddRequest(t *testing.T) {
 	ctx := context.Background()
 	t.Log("starting test ...")
 	args := []string{"-verbose", "-Message=high", "-twitteraccesssecret=12", "-twitterkey=34", "-twittertoken=1", "-twitterconsumersecret=2"}
 
 	tw, err := newtwitterClient(args, os.Stdout)
+
+	cleanupDB(tw, t)
 
 	if err != nil {
 		t.Errorf("expected no error but got %+v", err)
@@ -83,11 +102,14 @@ func TestAddRequest(t *testing.T) {
 }
 
 func TestAddFollowers(t *testing.T) {
+
 	ctx := context.Background()
 	t.Log("starting test ...")
 	args := []string{"-verbose", "-Message=high", "-twitteraccesssecret=12", "-twitterkey=34", "-twittertoken=1", "-twitterconsumersecret=2"}
 
 	tw, err := newtwitterClient(args, os.Stdout)
+
+	cleanupDB(tw, t)
 
 	if err != nil {
 		t.Errorf("expected no error but got %+v", err)
@@ -142,6 +164,8 @@ func TestUpdateDMStatus(t *testing.T) {
 	args := []string{"-verbose", "-Message=high", "-twitteraccesssecret=112", "-twitterkey=34", "-twittertoken=1", "-twitterconsumersecret=2"}
 
 	tw, err := newtwitterClient(args, os.Stdout)
+
+	cleanupDB(tw, t)
 
 	if err != nil {
 		t.Errorf("expected no error but got %+v", err)
