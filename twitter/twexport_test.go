@@ -2,6 +2,9 @@ package twitter
 
 import (
 	"bytes"
+	"context"
+	"github.com/dghubble/go-twitter/twitter"
+	"os"
 	"strings"
 	"testing"
 )
@@ -45,13 +48,150 @@ func TestFlagsCorrectness(t *testing.T) {
 	}
 }
 
-// func TestRetrieveFollowers(t *testing.T) {
-// 	tw := &twitterClient{Consumerkey: "12", ConsumerToken: "34"}
+func TestAddRequest(t *testing.T) {
+	ctx := context.Background()
+	t.Log("starting test ...")
+	args := []string{"-verbose", "-Message=high", "-twitteraccesssecret=12", "-twitterkey=34", "-twittertoken=1", "-twitterconsumersecret=2"}
 
-// 	err := tw.getFollowers(context.Background())
+	tw, err := newtwitterClient(args, os.Stdout)
 
-// 	if err != nil {
-// 		t.Errorf("Follower retrival failed with %+v", err)
-// 	}
+	if err != nil {
+		t.Errorf("expected no error but got %+v", err)
+	}
+	t.Log("calling save request ...")
 
-// }
+	id, err := db_saveRequest(&tw.smClient, ctx, tw.Consumerkey, tw.ConsumerSecret, tw.AccessToken, tw.AccessSecret)
+
+	if err != nil {
+		t.Errorf("expected no error but got %+v", err)
+	}
+
+	if id == 0 {
+		t.Errorf("expected non zero id but got %d", id)
+	}
+
+	newid, err := db_saveRequest(&tw.smClient, ctx, tw.Consumerkey, tw.ConsumerSecret, tw.AccessToken, tw.AccessSecret)
+
+	if err != nil {
+		t.Errorf("expected no error but got %+v", err)
+	}
+
+	if id != newid {
+		t.Errorf("expected same id %d but got %d", id, newid)
+	}
+
+}
+
+func TestAddFollowers(t *testing.T) {
+	ctx := context.Background()
+	t.Log("starting test ...")
+	args := []string{"-verbose", "-Message=high", "-twitteraccesssecret=12", "-twitterkey=34", "-twittertoken=1", "-twitterconsumersecret=2"}
+
+	tw, err := newtwitterClient(args, os.Stdout)
+
+	if err != nil {
+		t.Errorf("expected no error but got %+v", err)
+	}
+	t.Log("calling save request ...")
+
+	id, err := db_saveRequest(&tw.smClient, ctx, tw.Consumerkey, tw.ConsumerSecret, tw.AccessToken, tw.AccessSecret)
+
+	if err != nil {
+		t.Errorf("expected no error but got %+v", err)
+	}
+
+	if id == 0 {
+		t.Errorf("expected non zero id but got %d", id)
+	}
+
+	var ulist []twitter.User
+
+	for i := 1; i < 6; i++ {
+		var t twitter.User
+
+		t.Email = "abc" + string(i) + "@mail.com"
+		t.IDStr = "abc" + string(i*10)
+		t.IDStr = "abc" + string(i*10)
+		t.FollowersCount = i * 20
+		t.Location = "abc" + string(i)
+
+		ulist = append(ulist, t)
+	}
+
+	err = db_saveUsers(&tw.smClient, ctx, id, ulist)
+
+	if err != nil {
+		t.Errorf("expected no error but got %+v", err)
+	}
+
+	userlist, err := db_getFollowersbyLocation(&tw.smClient, ctx, id, tw.MaxDMPerDay)
+
+	if err != nil {
+		t.Errorf("expected no error but got %+v", err)
+	}
+
+	if len(ulist) != len(userlist) {
+		t.Errorf("expected count %d but got %d", len(ulist), len(userlist))
+	}
+
+}
+
+func TestUpdateDMStatus(t *testing.T) {
+	ctx := context.Background()
+	t.Log("starting test ...")
+	args := []string{"-verbose", "-Message=high", "-twitteraccesssecret=112", "-twitterkey=34", "-twittertoken=1", "-twitterconsumersecret=2"}
+
+	tw, err := newtwitterClient(args, os.Stdout)
+
+	if err != nil {
+		t.Errorf("expected no error but got %+v", err)
+	}
+	t.Log("calling save request ...")
+
+	id, err := db_saveRequest(&tw.smClient, ctx, tw.Consumerkey, tw.ConsumerSecret, tw.AccessToken, tw.AccessSecret)
+
+	if err != nil {
+		t.Errorf("expected no error but got %+v", err)
+	}
+
+	if id == 0 {
+		t.Errorf("expected non zero id but got %d", id)
+	}
+
+	var ulist []twitter.User
+
+	for i := 1; i < 6; i++ {
+		var t twitter.User
+
+		t.Email = "abc" + string(i) + "@mail.com"
+		t.IDStr = "abc" + string(i*10)
+		t.IDStr = "abc" + string(i*10)
+		t.FollowersCount = i * 20
+		t.Location = "abc" + string(i)
+
+		ulist = append(ulist, t)
+	}
+
+	err = db_saveUsers(&tw.smClient, ctx, id, ulist)
+
+	if err != nil {
+		t.Errorf("expected no error but got %+v", err)
+	}
+
+	userlist, err := db_getFollowersbyLocation(&tw.smClient, ctx, id, tw.MaxDMPerDay)
+
+	if err != nil {
+		t.Errorf("expected no error but got %+v", err)
+	}
+
+	if len(ulist) != len(userlist) {
+		t.Errorf("expected count %d but got %d", len(ulist), len(userlist))
+	}
+
+	err = db_updateFollowerDMStatus(&tw.smClient, ctx, userlist...)
+
+	if err != nil {
+		t.Errorf("expected no error but got %+v", err)
+	}
+
+}

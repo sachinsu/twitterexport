@@ -2,11 +2,11 @@ package twitter
 
 import (
 	"context"
-	"log"
+	"database/sql"
+	"strconv"
 	"strings"
 
 	"github.com/dghubble/go-twitter/twitter"
-	_ "github.com/go-sql-driver/mysql"
 )
 
 type twFollower struct {
@@ -21,27 +21,29 @@ type twFollower struct {
 //	id
 //  consumerkey
 //  consumertoken
-func db_saveRequest(sc *smClient, ctx context.Context, consumerkey string, consumertoken string, accesstoken string, accesssecret string) (int, error) {
+func db_saveRequest(sc *smClient, ctx context.Context, consumerkey string, consumersecret string, accesstoken string, accesssecret string) (int, error) {
 	var idVal int
+	sc.log.Printf("Opening Database with %s", sc.dbconnString)
+
 	db, teardown, err := sc.OpenConnection()
 	if err != nil {
 		return 0, err
 	}
 	defer teardown()
 
-	_, err = db.ExecContext(ctx, `INSERT INTO REQUEST (consumerkey,consumertoken,accesstoken,accesssecret) VALUES(?,?,?,?) 
-		ON DUPLICATE KEY UPDATE consumerkey = ?`, consumerkey, consumertoken, accesstoken, accesssecret, consumerkey)
+	_, err = db.ExecContext(ctx, `INSERT INTO REQUEST (consumerkey,consumersecret,accesstoken,accesssecret) VALUES(?,?,?,?) 
+		ON CONFLICT(consumerkey,consumersecret,accesstoken,accesssecret) DO NOTHING`, consumerkey, consumersecret, accesstoken, accesssecret, consumerkey)
 
 	if err != nil {
-		sc.log.Fatal("Error while inserting request")
+		sc.log.Printf("Error while inserting request %+v", err)
 		return 0, err
 	}
-	row := db.QueryRowContext(ctx, "SELECT id FROM REQUEST WHERE consumerkey=? and consumertoken=?", consumerkey, consumertoken)
+	row := db.QueryRowContext(ctx, "SELECT id FROM REQUEST WHERE consumerkey=? and consumersecret=? and accesstoken=? and accesssecret=?", consumerkey, consumersecret, accesstoken, accesssecret)
 
 	if err := row.Scan(&idVal); err != nil {
 		// Check for a scan error.
 		// Query rows will be closed with defer.
-		log.Fatal(err)
+		sc.log.Print("Error while retrieving id")
 		return 0, err
 	}
 
@@ -64,36 +66,42 @@ func db_saveUsers(sc *smClient, ctx context.Context, idVal int, userList []twitt
 	}
 	defer teardown()
 
-	// tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
-	// if err != nil {
-	// 	sc.log.Fatal("error starting transaction")
-	// 	return err
-	// }
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		sc.log.Fatal("error starting transaction")
+		return err
+	}
+	stmt, err := tx.Prepare(`INSERT INTO followers (request_id, email, id, followerscount, location)
+										values (?,?,?,?,?) 
+										on conflict(request_id, email) Do update set 
+											id=excluded.id, 
+											followerscount=excluded.followerscount,
+											location=excluded.location`)
 
-	var sb strings.Builder
-	var vals []interface{}
-
-	sb.WriteString(`INSERT INTO followers (request_id, email, id, followerscount, location)`)
-
+	if err != nil {
+		sc.log.Print("Error while preparing insert statement")
+		return err
+	}
 	// ref: https://golang.org/ref/spec#For_statements
 	for index, _ := range userList {
 		user := userList[index]
-		sb.WriteString(`values(?,?,?,?,?,?)`)
-		if index < len(userList)-1 {
-			sb.WriteString(",")
+		//ref:https://www.sqlite.org/lang_UPSERT.html
+		_, err := stmt.ExecContext(ctx, idVal, user.Email, user.IDStr, user.FollowersCount, user.Location)
+		if err != nil {
+			break
 		}
 		// ref: https://github.com/dghubble/go-twitter/blob/093ee2cf4e32ef608cded0ace84d5d82a52da4fa/twitter/users.go
 		// ref: https://stackoverflow.com/questions/21108084/how-to-insert-multiple-data-at-once
-		vals = append(vals, idVal, user.Email, user.IDStr, user.FollowersCount, user.Location)
 	}
 
-	sb.WriteString(` ON DUPLICATE KEY UPDATE followerscount = values(followerscount), location = values(location), dmsent = values(dmsent)`)
-
-	_, err = db.ExecContext(ctx, sb.String(), vals)
-
 	if err != nil {
-		sc.log.Fatal("Error while inserting request")
+		sc.log.Print("Error while inserting followers")
 		return err
+	} else {
+		if err = tx.Commit(); err != nil {
+			sc.log.Fatal("Error while committing data")
+			return err
+		}
 	}
 
 	return nil
@@ -106,13 +114,15 @@ func db_getFollowersbyLocation(sc *smClient, ctx context.Context, idVal int, max
 	}
 	defer teardown()
 
-	rows, err := db.QueryContext(ctx, `Select followerid, id 
+	stmt := `Select followerid, id 
 						  from followers 
-						  where request_id= ? and dmsent = 0 
-						  order by location, followercount limit `+string(maxCount), idVal)
+						  where request_id= ? and dmsent = 0
+						  order by location, followerscount limit ` + strconv.Itoa(maxCount)
+
+	rows, err := db.QueryContext(ctx, stmt, idVal)
 
 	if err != nil {
-		sc.log.Fatal("Error fetching Followers data")
+		sc.log.Print("Error fetching Followers data")
 		return nil, err
 	}
 	defer rows.Close()
@@ -121,7 +131,7 @@ func db_getFollowersbyLocation(sc *smClient, ctx context.Context, idVal int, max
 	for rows.Next() {
 		var twF twFollower
 		if err := rows.Scan(&twF.followerid, &twF.Id); err != nil {
-			sc.log.Fatal(err)
+			sc.log.Print(err)
 			return nil, err
 		}
 		followersList = append(followersList, twF)
@@ -143,21 +153,18 @@ func db_updateFollowerDMStatus(sc *smClient, ctx context.Context, list ...twFoll
 	defer teardown()
 
 	sb.WriteString(` update followers 
-				set dmset = 1 
-				where `)
+				set dmsent = 1
+				where followerid = 0`)
 
 	for index, _ := range list {
-		sb.WriteString("  followerid = ? ")
-		if index < len(list) {
-			sb.WriteString(` or `)
-		}
+		sb.WriteString(" or followerid = ? ")
 		vals = append(vals, list[index].followerid)
 	}
 
 	_, err = db.ExecContext(ctx, sb.String(), vals...)
 
 	if err != nil {
-		sc.log.Fatal("Error while updating DM sent Status")
+		sc.log.Print("Error while updating DM sent Status")
 		return err
 	}
 

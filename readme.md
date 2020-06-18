@@ -14,7 +14,7 @@ In Brief,
     * be easy to use and maintain
 
 * Notes,
-    * Due to Daily DM Limit, Follower details will have to be persisted alongside flag indicating if DM has been sent. Mysql is being used but SQLITE is good candidate here from simplicity perspective.
+    * Due to Daily DM Limit, Follower details will have to be persisted alongside flag indicating if DM has been sent. SQLIte is used from simplicity perspective.
     * There should be a scheduled job that will send the DM upto daily DM Limit. At the same time, it needs to refetch any new followers and push them in the flow (reconcile).
     * Potentially, this could be extended to other social media providers other than twitter.
     * Milestones,

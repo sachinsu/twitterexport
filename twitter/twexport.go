@@ -62,16 +62,12 @@ func newtwitterClient(args []string, stdout io.Writer) (*twitterClient, error) {
 	}
 
 	twClient.log = log.New(stdout, "TWEXPORT: ", log.Lshortfile)
+	twClient.dbconnString = os.Getenv("CONNECTION_STRING")
+	if twClient.dbconnString == "" {
+		twClient.dbconnString = "file:test.db?cache=shared" //&mode=memory"
+	}
 
 	return &twClient, nil
-}
-
-func getenv(name string) string {
-	v := os.Getenv(name)
-	if v == "" {
-		panic("missing required environment variable " + name)
-	}
-	return v
 }
 
 func (t *twitterClient) SendDM(requestId int, ctx context.Context) error {
