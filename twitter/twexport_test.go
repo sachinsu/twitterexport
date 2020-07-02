@@ -101,11 +101,49 @@ func TestAddRequest(t *testing.T) {
 
 }
 
+func TestGetFollowers(t *testing.T) {
+	ctx := context.Background()
+	t.Log("starting test ...")
+	args := []string{"-verbose", "-Message=high",
+		"-twitterkey=1",
+		"-twitterconsumersecret=1",
+		"-twittertoken=17",
+		"-twitteraccesssecret=1"}
+
+	tw, err := newtwitterClient(args, os.Stdout)
+
+	cleanupDB(tw, t)
+
+	if err != nil {
+		t.Errorf("expected no error but got %+v", err)
+	}
+
+	rid, err := tw.getFollowers(ctx)
+	if err != nil {
+		t.Errorf("expected no error but got %+v", err)
+	}
+
+	userlist, err := db_getFollowersbyLocation(&tw.smClient, ctx, rid, tw.MaxDMPerDay)
+
+	if err != nil {
+		t.Errorf("expected no error but got %+v", err)
+	}
+
+	if 0 == len(userlist) {
+		t.Errorf("expected > 0 but got %d", len(userlist))
+	}
+
+}
+
 func TestAddFollowers(t *testing.T) {
 
 	ctx := context.Background()
 	t.Log("starting test ...")
-	args := []string{"-verbose", "-Message=high", "-twitteraccesssecret=12", "-twitterkey=34", "-twittertoken=1", "-twitterconsumersecret=2"}
+	args := []string{"-verbose", "-Message=high",
+		"-twitterkey=EQPcg0bKrAryQ8eW4RtRt9Z5r",
+		"-twitterconsumersecret=1vURiRtFEFvrQ7z6vhD9b3MOcwla0ypNgSDdIAthlfg9QLMVeW",
+		"-twittertoken=845897973586448385-kxmE1t9DgvQYB1ksXJdpkSgZ4qoNLk7",
+		"-twitteraccesssecret=a6ez9l7FuZ6Rp1gbzQT2D5byyLC7p6VJG81UsRdjb5EeB"}
 
 	tw, err := newtwitterClient(args, os.Stdout)
 

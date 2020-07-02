@@ -85,8 +85,9 @@ func db_saveUsers(sc *smClient, ctx context.Context, idVal int, userList []twitt
 	// ref: https://golang.org/ref/spec#For_statements
 	for index, _ := range userList {
 		user := userList[index]
+		sc.log.Printf("Saving %s\n", user.Name)
 		//ref:https://www.sqlite.org/lang_UPSERT.html
-		_, err := stmt.ExecContext(ctx, idVal, user.Email, user.IDStr, user.FollowersCount, user.Location)
+		_, err := stmt.ExecContext(ctx, idVal, user.Name, user.IDStr, user.FollowersCount, user.Location)
 		if err != nil {
 			break
 		}

@@ -117,7 +117,7 @@ func (t *twitterClient) SendDM(requestId int, ctx context.Context) error {
 	return nil
 }
 
-func (t *twitterClient) getFollowers(ctx context.Context) error {
+func (t *twitterClient) getFollowers(ctx context.Context) (int, error) {
 	g, ctx := errgroup.WithContext(ctx)
 	users := make(chan []twitter.User)
 	/*
@@ -126,12 +126,17 @@ func (t *twitterClient) getFollowers(ctx context.Context) error {
 	requestid, err := db_saveRequest(&t.smClient, ctx, t.Consumerkey, t.ConsumerSecret, t.AccessToken, t.AccessSecret)
 	if err != nil {
 		t.log.Fatal("Error saving Request")
-		return err
+		return 0, err
+	} else {
+		t.log.Println("Request saved to DB")
 	}
 
 	// refer https://godoc.org/golang.org/x/sync/errgroup#ex-Group--Pipeline
 	g.Go(func() error {
 		defer close(users)
+
+		t.log.Printf("Consumerkey:%s\nConsumersecret:%s\nAccesstoken:%s\nSecret:%s\n",
+			t.Consumerkey, t.ConsumerSecret, t.AccessToken, t.AccessSecret)
 
 		config := oauth1.NewConfig(t.Consumerkey, t.ConsumerSecret)
 		token := oauth1.NewToken(t.AccessToken, t.AccessSecret)
@@ -144,11 +149,15 @@ func (t *twitterClient) getFollowers(ctx context.Context) error {
 
 		for {
 
+			t.log.Println("Getting the list of followers")
+
 			followers, _, err := client.Followers.List(&params)
 
 			if err != nil {
 				t.log.Fatal("Error while retrieving followers ")
 				return err
+			} else {
+				t.log.Printf("Got followers %d\n", len(followers.Users))
 			}
 
 			//ref: https://stackoverflow.com/questions/24703943/passing-a-slice-into-a-channel
@@ -165,6 +174,7 @@ func (t *twitterClient) getFollowers(ctx context.Context) error {
 				return nil
 			} else {
 				// below is  set to get next set of followers
+				t.log.Println("moving cursor in routine")
 				params.Cursor = followers.NextCursor
 			}
 
@@ -175,17 +185,12 @@ func (t *twitterClient) getFollowers(ctx context.Context) error {
 	// Below is routine to insert followers in database
 	g.Go(func() error {
 		for elem := range users {
-
 			err := db_saveUsers(&t.smClient, ctx, requestid, elem)
 			if err != nil {
 				return err
 			}
-
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			}
 		}
+		// t.log.Println("Done with all followers")
 		return nil
 	})
 
@@ -194,8 +199,8 @@ func (t *twitterClient) getFollowers(ctx context.Context) error {
 	}()
 
 	if err := g.Wait(); err != nil {
-		return err
+		return 0, err
 	} else {
-		return nil
+		return requestid, nil
 	}
 }

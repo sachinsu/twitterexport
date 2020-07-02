@@ -1,13 +1,27 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
-	"github.com/sachinsu/twexport/twitter"
 	"io"
 	"os"
+	"os/signal"
 	"runtime/pprof"
+
+	"github.com/sachinsu/twexport/twitter"
 )
+
+/*
+API key:EQPcg0bKrAryQ8eW4RtRt9Z5r
+API secret key:1vURiRtFEFvrQ7z6vhD9b3MOcwla0ypNgSDdIAthlfg9QLMVeW
+
+Access token: 845897973586448385-kxmE1t9DgvQYB1ksXJdpkSgZ4qoNLk7
+
+Access token secret: a6ez9l7FuZ6Rp1gbzQT2D5byyLC7p6VJG81UsRdjb5EeB
+
+
+*/
 
 const (
 	exitFail = 1
