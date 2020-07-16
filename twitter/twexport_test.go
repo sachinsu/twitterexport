@@ -139,11 +139,11 @@ func TestAddFollowers(t *testing.T) {
 
 	ctx := context.Background()
 	t.Log("starting test ...")
-	args := []string{"-verbose", "-Message=high",
-		"-twitterkey=EQPcg0bKrAryQ8eW4RtRt9Z5r",
-		"-twitterconsumersecret=1vURiRtFEFvrQ7z6vhD9b3MOcwla0ypNgSDdIAthlfg9QLMVeW",
-		"-twittertoken=845897973586448385-kxmE1t9DgvQYB1ksXJdpkSgZ4qoNLk7",
-		"-twitteraccesssecret=a6ez9l7FuZ6Rp1gbzQT2D5byyLC7p6VJG81UsRdjb5EeB"}
+	// todo: add from out file
+
+
+
+
 
 	tw, err := newtwitterClient(args, os.Stdout)
 
